@@ -39,6 +39,9 @@ async function init() {
   const offerSdpTextarea = document.querySelector('div#local textarea');
   const answerSdpTextarea = document.querySelector('div#remote textarea');
 
+  const localQueuedCandidateUl = document.querySelector('div#local ul');
+  const remoteQueuedCandidateUl = document.querySelector('div#remote ul');
+
   const audioSelect = document.querySelector('select#audioSrc');
   const videoSelect = document.querySelector('select#videoSrc');
 
@@ -302,20 +305,51 @@ async function init() {
     return (pc === localPeerConnection) ? remotePeerConnection : localPeerConnection;
   }
 
+  function getQueuedCandidateUl(pc) {
+    return (pc === localPeerConnection) ? localQueuedCandidateUl : remoteQueuedCandidateUl;
+  }
+
   function getName(pc) {
     return (pc === localPeerConnection) ? 'localPeerConnection' : 'remotePeerConnection';
   }
 
+  function candidateLi(pc, candidate) {
+    const li = document.createElement('li');
+    const textarea = document.createElement('textarea');
+    textarea.value = candidate.candidate;
+    textarea.rows = '3';
+    li.appendChild(textarea);
+    const button = document.createElement('button');
+    button.innerHTML = 'addIceCandidate';
+    button.onclick = (e) => addQueuedIceCandidate(li, textarea, pc, candidate);
+    button.disabled = false
+    li.appendChild(button);
+    return li
+  }
+
   async function onIceCandidate(pc, event) {
+    if (event.candidate) {
+      const ul = await getQueuedCandidateUl(getOtherPc(pc));
+      const li = candidateLi(pc, event.candidate)
+      ul.appendChild(li);
+    }
+
+    console.log(`${getName(pc)} ICE candidate:\n${event.candidate ? event.candidate.candidate : '(null)'}`);
+  }
+
+  async function addQueuedIceCandidate(li, textarea, pc, candidate) {
+    li.parentNode.removeChild(li);
+    candidate.candidate = textarea.value;
+
     try {
       // eslint-disable-next-line no-unused-vars
-      const ignore = await getOtherPc(pc).addIceCandidate(event.candidate);
+      const ignore = await getOtherPc(pc).addIceCandidate(candidate);
       onAddIceCandidateSuccess(pc);
     } catch (e) {
       onAddIceCandidateError(pc, e);
     }
 
-    console.log(`${getName(pc)} ICE candidate:\n${event.candidate ? event.candidate.candidate : '(null)'}`);
+    console.log(`${getName(getOtherPc(pc))} added ICE candidate:\n${candidate.candidate}`);
   }
 
   function onAddIceCandidateSuccess() {
